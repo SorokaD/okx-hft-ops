@@ -1,0 +1,51 @@
+name: Docker Compose Smoke Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Docker Compose
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker-compose
+    
+    - name: Start ClickHouse
+      run: |
+        cd docker-compose/clickhouse
+        docker-compose up -d
+        sleep 30  # Wait for ClickHouse to start
+    
+    - name: Test ClickHouse connection
+      run: |
+        docker run --rm --network clickhouse_clickhouse_network clickhouse/clickhouse-client \
+          --host clickhouse --query "SELECT 1"
+    
+    - name: Run basic queries
+      run: |
+        docker run --rm --network clickhouse_clickhouse_network clickhouse/clickhouse-client \
+          --host clickhouse --query "SHOW DATABASES"
+    
+    - name: Test data insertion
+      run: |
+        docker run --rm --network clickhouse_clickhouse_network clickhouse/clickhouse-client \
+          --host clickhouse --query "
+          CREATE DATABASE IF NOT EXISTS test_db;
+          CREATE TABLE IF NOT EXISTS test_db.test_table (id UInt32, name String) ENGINE = MergeTree() ORDER BY id;
+          INSERT INTO test_db.test_table VALUES (1, 'test');
+          SELECT * FROM test_db.test_table;
+          "
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        cd docker-compose/clickhouse
+        docker-compose down -v
