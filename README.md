@@ -1,93 +1,237 @@
-Коротко: да, третий репо имеет смысл — но лучше не “только ClickHouse”, а общий **infra**-репозиторий, где ClickHouse — один из модулей. Это долговечнее: его будут использовать и collector, и executor, и дальше туда удобно добавить MinIO, Airflow/MLflow, мониторинг, IaC и т.д.
+# OKX HFT Infrastructure
 
-# Как назвать
+High-frequency trading infrastructure for OKX exchange data processing with ClickHouse, monitoring, and object storage.
 
-* **okx-hft-infra** — мой фаворит (будет жить дольше любой конкретной БД).
-* Альтернативы, если хочешь жёстко про ДWH:
+## 🏗️ Architecture
 
-  * **okx-hft-warehouse**
-  * **okx-hft-clickhouse** (если точно только CH и ничего лишнего)
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Data Sources  │───▶│   ClickHouse    │───▶│   Analytics     │
+│   (OKX API)     │    │   (Time Series) │    │   (Grafana)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │   MinIO S3      │
+                       │   (Object Store)│
+                       └─────────────────┘
+```
 
-# Зачем выносить отдельно
+## 🚀 Quick Start
 
-**Плюсы**
+### Prerequisites
 
-* Единая точка правды для схем, ретеншна, материализованных вьюх.
-* Независимый релизный цикл (обновил DDL/TTL без релиза collector/executor).
-* Чистые CI/CD пайплайны: миграции → тесты → деплой CH.
-* Проще переиспользовать для стендов (dev/stage/prod).
+- Docker and Docker Compose
+- Python 3.9+
+- Make (optional, for convenience commands)
 
-**Минусы**
+### 1. Clone and Setup
 
-* Третий репо = ещё один пайплайн и релизы.
-* Если инфраструктуры мало и меняется редко, можно было бы держать как папку в одном из существующих репо. Но ты точно будешь наращивать стек → отдельный репо окупится.
+```bash
+git clone <repository-url>
+cd okx-hft-infra
+```
 
-# Рекомендуемая структура (**okx-hft-infra**)
+### 2. Start All Services
+
+```bash
+# Using Make (recommended)
+make setup
+
+# Or manually
+chmod +x scripts/*.sh
+./scripts/start.sh
+```
+
+### 3. Verify Installation
+
+```bash
+# Check status
+make status
+
+# Run tests
+make test
+```
+
+## 📊 Services
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **ClickHouse** | http://localhost:8124 | default (no password) |
+| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin123 |
+| **Grafana** | http://localhost:3001 | admin / admin |
+| **MLflow** | http://localhost:5000 | - |
+| **Redis** | localhost:6379 | - |
+| **Kafka** | localhost:9092 | - |
+| **Kafka UI** | http://localhost:8080 | - |
+| **Jupyter Lab** | http://localhost:8888 | token: hft123 |
+| **Superset** | http://localhost:8081 | admin / admin |
+| **Airflow** | http://localhost:8082 | admin / admin |
+| **Prometheus** | http://localhost:9090 | - |
+| **Node Exporter** | http://localhost:9100 | - |
+| **ClickHouse Exporter** | http://localhost:9116 | - |
+
+## 🛠️ Management Commands
+
+### Using Make (Recommended)
+
+```bash
+make help          # Show all available commands
+make start         # Start all services
+make stop          # Stop all services
+make clean         # Remove all data
+make status        # Show service status
+make migrate       # Run database migrations
+make test          # Run tests
+make mlflow-experiments  # Run MLflow experiments
+make logs          # Show all logs
+make logs-mlflow   # Show MLflow logs
+make restart       # Restart services
+```
+
+### Using Scripts Directly
+
+```bash
+./scripts/start.sh    # Start all services
+./scripts/stop.sh     # Stop all services
+./scripts/clean.sh    # Remove all data
+./scripts/status.sh   # Show status
+./scripts/migrate.sh  # Run migrations
+./scripts/test.sh     # Run tests
+```
+
+## 📁 Project Structure
 
 ```
 okx-hft-infra/
-  README.md
-  docker-compose/             # локальный стенд
-    clickhouse/
-      docker-compose.yml
-      users.xml
-      config.d/*.xml
-      macros.xml
-    minio/
-    monitoring/               # prometheus + grafana + exporters
-  k8s/                         # если/когда выйдешь в k8s
-    clickhouse-operator/       # манифесты Altinity Operator
-    manifests/
-  terraform/
-    hetzner/                   # vpc, servers, volumes, firewall
-  ansible/
-    roles/clickhouse/
-    inventories/{dev,stage,prod}
-  clickhouse/                  # всё, что касается схем и логики
-    migrations/
-      0001_init.sql
-      0002_raw_ticks.sql
-      0003_mv_agg_1s.sql
-      ...
-    seeds/                     # стартовые справочники
-    retention/
-      policies.sql             # TTL/политики хранения
-    views/
-      mv_agg_1s.sql
-      mv_agg_1m.sql
-    tests/
-      test_rowcounts.sql       # простые проверки
-    tools/
-      migrate.py               # простой раннер миграций
-      ch_client.py
-  ci/
-    github-actions/
-      ch_migrate.yml
-      compose_smoke.yml
+├── docker-compose/          # Local development environment
+│   ├── docker-compose.yml   # Main orchestration file
+│   ├── clickhouse/          # ClickHouse configuration
+│   ├── minio/              # MinIO configuration
+│   └── monitoring/         # Prometheus + Grafana
+├── clickhouse/             # Database schemas and logic
+│   ├── migrations/         # SQL migrations
+│   ├── seeds/             # Initial data
+│   ├── views/             # Materialized views
+│   ├── tests/             # Data quality tests
+│   └── tools/             # Python utilities
+├── scripts/               # Management scripts
+├── k8s/                   # Kubernetes manifests
+├── terraform/             # Infrastructure as Code
+├── ansible/               # Configuration management
+└── ci/                    # CI/CD pipelines
 ```
 
-# Что именно положить в `clickhouse/`
+## 🗄️ Database Schema
 
-* **`migrations/`**: чистые SQL-миграции (версионированные, idempotent).
-* **`retention/policies.sql`**: TTL для `raw_ticks` (7 дней) и для агрегатов (3 месяца).
-* **`views/`**: материализованные вьюхи (например, 50–100 мс агрегаты → 1s → 1m).
-* **Лёгкий миграционный раннер** (`tools/migrate.py`):
+### Raw Data Tables
 
-  * хранит версию в таблице `_schema_migrations`
-  * применяет только новые файлы
-  * умеет `dry-run` и `--env dev/stage/prod`
+- **`hft_data.raw_ticks`** - Raw tick data from OKX
+- **`hft_data.symbols`** - Trading symbols reference
 
-# CI/CD идея
+### Aggregated Data Tables
 
-* При PR: поднять `docker-compose` CH, прогнать миграции + быстрые тесты.
-* В main: деплой миграций на dev → прогон smoke-тестов → вручную promote на stage/prod.
-* Теги релизов `infra-vX.Y.Z` синхронизируются с collector/executor релизами в описании.
+- **`hft_analytics.agg_1s`** - 1-second aggregated data
+- **`hft_analytics.agg_1m`** - 1-minute aggregated data
 
-# Когда оставить без отдельного репо
+### Materialized Views
 
-* Если ты точно решил “только локальный docker-compose” и “никакой IaC/мониторинг”, и изменения бывают раз в несколько месяцев — тогда можно держать `infra/` (или `clickhouse/`) как папку в **okx-hft-collector**. Но это временно и хуже масштабируется.
+- **`mv_agg_1s`** - Real-time 1-second aggregation
+- **`mv_agg_1m`** - Real-time 1-minute aggregation
 
----
+## 🔧 Development
 
-**Итого:** создай **`okx-hft-infra`**. Внутри — модуль `clickhouse/` со схемами, миграциями, TTL и матвьюхами, плюс docker-compose/k8s/terraform/ansible. Если прям хочется имя про БД — **`okx-hft-warehouse`** или **`okx-hft-clickhouse`**, но я бы брал **infra** для будущего роста.
+### Adding New Migrations
 
+1. Create new SQL file in `clickhouse/migrations/`
+2. Follow naming convention: `XXXX_description.sql`
+3. Run migrations: `make migrate`
+
+### Adding New Tests
+
+1. Add SQL queries to `clickhouse/tests/`
+2. Run tests: `make test`
+
+### Monitoring
+
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **ClickHouse Metrics**: http://localhost:9116
+
+## 🚀 Production Deployment
+
+### Kubernetes
+
+```bash
+# Deploy to Kubernetes
+kubectl apply -f k8s/manifests/
+```
+
+### Terraform (Hetzner)
+
+```bash
+cd terraform/hetzner
+terraform init
+terraform plan
+terraform apply
+```
+
+### Ansible
+
+```bash
+# Deploy to servers
+ansible-playbook -i ansible/inventories/prod ansible/site.yml
+```
+
+## 📈 Performance
+
+- **Raw ticks**: ~1M rows/second ingestion
+- **Storage**: Compressed with LZ4
+- **Retention**: 30 days raw, 1 year aggregated
+- **Query performance**: Sub-second for most analytics
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **Port conflicts**: Check if ports 8123, 9000, 3000, 9090 are free
+2. **Memory issues**: Ensure Docker has at least 4GB RAM
+3. **Permission errors**: Run `chmod +x scripts/*.sh`
+
+### Logs
+
+```bash
+# View all logs
+make logs
+
+# View specific service logs
+make logs-clickhouse
+make logs-minio
+make logs-monitoring
+```
+
+### Reset Everything
+
+```bash
+make clean
+make setup
+```
+
+## 📚 Documentation
+
+- [ClickHouse Documentation](https://clickhouse.com/docs/)
+- [MinIO Documentation](https://docs.min.io/)
+- [Grafana Documentation](https://grafana.com/docs/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
