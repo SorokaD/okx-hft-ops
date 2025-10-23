@@ -36,7 +36,7 @@ else
 fi
 
 # Check Prometheus
-if curl -s http://localhost:9090/-/ready > /dev/null 2>&1; then
+if curl -s http://localhost:9092/-/ready > /dev/null 2>&1; then
     echo "  ✅ Prometheus: Running"
 else
     echo "  ❌ Prometheus: Not responding"
@@ -58,9 +58,9 @@ fi
 
 echo ""
 echo "🔗 Service URLs:"
-echo "  ClickHouse:     http://localhost:8124"
+echo "  ClickHouse:     http://localhost:8123"
 echo "  MinIO Console:  http://localhost:9001"
-echo "  Prometheus:     http://localhost:9090"
+echo "  Prometheus:     http://localhost:9092"
 echo "  Grafana:        http://localhost:3001"
 echo "  MLflow:         http://localhost:5000"
 echo "  Node Exporter:  http://localhost:9100"

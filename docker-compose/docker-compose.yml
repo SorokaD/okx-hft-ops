@@ -6,7 +6,7 @@ services:
     image: clickhouse/clickhouse-server:latest
     container_name: clickhouse
     ports:
-      - "8124:8123"
+      - "8123:8123"
       - "9003:9000"
     volumes:
       - ./clickhouse/config.d:/etc/clickhouse-server/config.d
@@ -67,9 +67,9 @@ services:
   # Prometheus Monitoring
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    container_name: hft-prometheus
     ports:
-      - "9090:9090"
+      - "9092:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -196,7 +196,7 @@ services:
     image: confluentinc/cp-kafka:latest
     container_name: kafka
     ports:
-      - "9092:9092"
+      - "9093:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181

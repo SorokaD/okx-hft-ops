@@ -58,17 +58,17 @@ make test
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **ClickHouse** | http://localhost:8124 | default (no password) |
+| **ClickHouse** | http://localhost:8123 | default (hft_user/hft_password)  |
 | **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin123 |
 | **Grafana** | http://localhost:3001 | admin / admin |
 | **MLflow** | http://localhost:5000 | - |
 | **Redis** | localhost:6379 | - |
-| **Kafka** | localhost:9092 | - |
+| **Kafka** | localhost:9093 | - |
 | **Kafka UI** | http://localhost:8080 | - |
 | **Jupyter Lab** | http://localhost:8888 | token: hft123 |
 | **Superset** | http://localhost:8081 | admin / admin |
 | **Airflow** | http://localhost:8082 | admin / admin |
-| **Prometheus** | http://localhost:9090 | - |
+| **Prometheus** | http://localhost:9092 | - |
 | **Node Exporter** | http://localhost:9100 | - |
 | **ClickHouse Exporter** | http://localhost:9116 | - |
 
