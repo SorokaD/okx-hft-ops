@@ -1,4 +1,5 @@
 # OKX HFT Infrastructure
+upd 23.10.25 все поднимается, все работает
 
 High-frequency trading infrastructure for OKX exchange data processing with ClickHouse, monitoring, and object storage.
 
