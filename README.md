@@ -1,5 +1,6 @@
 # OKX HFT Infrastructure
 upd 23.10.25 все поднимается, все работает
+upd 29.10.25 все поднимается, все работает, пофиксил конфликт портов
 
 High-frequency trading infrastructure for OKX exchange data processing with ClickHouse, monitoring, and object storage.
 
@@ -69,6 +70,10 @@ make test
 | **Superset** | http://localhost:8081 | admin / admin |
 | **Airflow** | http://localhost:8082 | admin / admin |
 | **Prometheus** | http://localhost:9092 | - |
+| **AlertManager** | http://localhost:9094 | - |
+| **Jaeger** | http://localhost:16686 | - |
+| **Elasticsearch** | http://localhost:9200 | - |
+| **Kibana** | http://localhost:5601 | - |
 | **Node Exporter** | http://localhost:9100 | - |
 | **ClickHouse Exporter** | http://localhost:9116 | - |
 
