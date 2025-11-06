@@ -1,6 +1,7 @@
 # OKX HFT Infrastructure
 upd 23.10.25 все поднимается, все работает
 upd 29.10.25 все поднимается, все работает, пофиксил конфликт портов
+upd 06.11.25 все сервисы запущены, исправлены конфигурации Kafka, Superset, Airflow, обновлена документация
 
 High-frequency trading infrastructure for OKX exchange data processing with ClickHouse, monitoring, and object storage.
 
@@ -59,8 +60,10 @@ make test
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **ClickHouse** | http://localhost:8123 | default (hft_user/hft_password)  |
+| **ClickHouse** | http://localhost:8123 | default (без пароля) или hft_user / hft_password |
+| **ClickHouse Native** | localhost:9003 | default (без пароля) или hft_user / hft_password |
 | **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin123 |
+| **MinIO API** | http://localhost:9002 | minioadmin / minioadmin123 |
 | **Grafana** | http://localhost:3001 | admin / admin |
 | **MLflow** | http://localhost:5000 | - |
 | **Redis** | localhost:6379 | - |
@@ -160,9 +163,11 @@ okx-hft-infra/
 
 ### Monitoring
 
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3001 (admin/admin)
+- **Prometheus**: http://localhost:9092
+- **AlertManager**: http://localhost:9094
 - **ClickHouse Metrics**: http://localhost:9116
+- **Node Exporter**: http://localhost:9100
 
 ## 🚀 Production Deployment
 
@@ -200,9 +205,10 @@ ansible-playbook -i ansible/inventories/prod ansible/site.yml
 
 ### Common Issues
 
-1. **Port conflicts**: Check if ports 8123, 9000, 3000, 9090 are free
-2. **Memory issues**: Ensure Docker has at least 4GB RAM
+1. **Port conflicts**: Check if ports 8123, 9001, 9002, 9003, 3001, 5000, 6379, 8080, 8081, 8082, 9092, 9093, 9094, 9100, 9116, 9200, 5601, 16686 are free
+2. **Memory issues**: Ensure Docker has at least 4GB RAM (8GB recommended for all services)
 3. **Permission errors**: Run `chmod +x scripts/*.sh`
+4. **Service startup issues**: Check logs with `docker-compose logs <service-name>`
 
 ### Logs
 
