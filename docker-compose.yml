@@ -5,6 +5,7 @@ name: ${COMPOSE_PROJECT_NAME:-okx_hft_ops}
 networks:
   hft_network:
     name: ${HFT_NETWORK:-hft_network}
+    external: true
 
 volumes:
   minio_data: {}
@@ -140,7 +141,10 @@ services:
       - hft_network
 
   superset:
-    image: apache/superset:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
+    image: okx-hft-ops-superset
     environment:
       SUPERSET_ENV: production
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
