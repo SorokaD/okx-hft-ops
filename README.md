@@ -1,249 +1,100 @@
-# OKX HFT Infrastructure
-upd 23.10.25 все поднимается, все работает
-upd 29.10.25 все поднимается, все работает, пофиксил конфликт портов
-upd 06.11.25 все сервисы запущены, исправлены конфигурации Kafka, Superset, Airflow, обновлена документация
+OKX HFT Ops (okx-hft-ops)
 
-High-frequency trading infrastructure for OKX exchange data processing with ClickHouse, monitoring, and object storage.
+Назначение
+- Этот репозиторий — узел операций/инфраструктуры/мониторинга для пет‑проекта OKX HFT.
+- Здесь нет бизнес‑логики трейдинга — только инфраструктура, мониторинг и сопутствующие сервисы.
+- Связанные репозитории: `okx-hft-collector`, `okx-hft-executor`, `okx-hft-timescaledb`.
 
-## 🏗️ Architecture
+Что входит
+- MinIO — объектное хранилище (артефакты, данные)
+- MLflow — трекинг ML‑экспериментов (артефакты в MinIO)
+- Prometheus — сбор метрик
+- Loki + Promtail — сбор и хранение логов контейнеров
+- Grafana — дашборды по метрикам и логам
+- Superset — BI/аналитика
+- Опционально: Nginx reverse‑proxy для доступа ко всем UI через один порт
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Data Sources  │───▶│   ClickHouse    │───▶│   Analytics     │
-│   (OKX API)     │    │   (Time Series) │    │   (Grafana)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   MinIO S3      │
-                       │   (Object Store)│
-                       └─────────────────┘
-```
+Архитектура (Ops‑узел)
+- Общая сеть Docker: `hft_network`
+- Сервисы:
+  - `minio`: объектное хранилище (в т.ч. бакет `mlflow` для артефактов)
+  - `mlflow`: сервер экспериментов (SQLite backend, артефакты в S3/MinIO)
+  - `prometheus`: сбор метрик из сервисов
+  - `loki`: хранилище логов
+  - `promtail`: агент, отправляющий docker‑логи в Loki
+  - `grafana`: дашборды (datasource: Prometheus и Loki)
+  - `superset`: BI
+  - `reverse-proxy` (опция): единая точка входа по HTTP
 
-## 🚀 Quick Start
+Быстрый старт (локально)
+1) Подготовить окружение:
+   - Скопируйте `.env.example` в `.env` и задайте надёжные секреты.
+2) Запустить стек:
+   - `docker compose up -d`
+3) Доступ к UI (порты/пути по умолчанию):
+   - Grafana: через reverse‑proxy http://localhost:8080/grafana (прямой порт 3000 не публикуется)
+   - Prometheus: http://localhost:9090
+   - Loki (API): http://localhost:3100
+   - MLflow: http://localhost:5000 (или через reverse‑proxy http://localhost:8080/mlflow)
+   - MinIO Console: http://localhost:9001, S3 endpoint: http://localhost:9000 (или http://localhost:8080/minio)
+   - Superset: http://localhost:8088 (или через reverse‑proxy http://localhost:8080/superset)
 
-### Prerequisites
+Примечания
+- Для MLflow требуется бакет `mlflow` в MinIO. Создайте его один раз в консоли MinIO (http://localhost:9001).
+- Grafana автоматически провиженит источники данных (Prometheus, Loki) и подхватывает дашборды из `grafana/dashboards/`.
+- Promtail собирает логи всех docker‑контейнеров хоста и отправляет их в Loki.
+- Prometheus пытается скрапить стандартные эндпоинты сервисов; если сервис не экспортирует метрики, он может быть в состоянии DOWN — это ожидаемо.
 
-- Docker and Docker Compose
-- Python 3.9+
-- Make (optional, for convenience commands)
+Следующие шаги
+- Airflow стек в `airflow/` с примерными DAG’ами
+- Отдельные docker‑compose файлы для MLflow и Superset в `mlflow/` и `superset/`
+- IaC: `terraform/` (Hetzner Cloud пример) и `ansible/` (bootstrap роли)
 
-### 1. Clone and Setup
+Сервисы и порты (по умолчанию)
+- MinIO API: 9000, MinIO Console: 9001
+- MLflow: 5000
+- Prometheus: 9090
+- Loki: 3100
+- Grafana: доступ через reverse‑proxy на 8080 (`/grafana`) — прямой порт не маппится
+- Superset: 8088
+- Reverse‑proxy (опция): 8080
 
-```bash
-git clone <repository-url>
-cd okx-hft-infra
-```
+Переменные окружения
+- Все чувствительные значения задаются через `.env` (см. шаблон `.env.example`).
+- Для MLflow артефактов используются `MLFLOW_S3_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `MLFLOW_ARTIFACT_ROOT`.
 
-### 2. Start All Services
+Обновления
+- Стек ориентирован на локальный запуск для разработки/отладки инфраструктуры OKX HFT.
+- В продакшене предусмотрено вынесение сервисов, хранение данных на выделенных томах, мониторинг и алертинг через Prometheus/Grafana, логи в Loki.
 
-```bash
-# Using Make (recommended)
-make setup
 
-# Or manually
-chmod +x scripts/*.sh
-./scripts/start.sh
-```
 
-### 3. Verify Installation
+---
+Вот короткие описания.  
 
-```bash
-# Check status
-make status
+### Сервисы `okx-hft-ops`
 
-# Run tests
-make test
-```
+* **MinIO**
+  Объектное хранилище (аналог S3). Храним артефакты ML (модели, датасеты, логи), к нему ходит MLflow как в S3.
 
-## 📊 Services
+* **MLflow**
+  Трекер экспериментов и реестр моделей. Логируем метрики, параметры, версии моделей, сохраняем артефакты в MinIO.
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| **ClickHouse** | http://localhost:8123 | default (без пароля) или hft_user / hft_password |
-| **ClickHouse Native** | localhost:9003 | default (без пароля) или hft_user / hft_password |
-| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin123 |
-| **MinIO API** | http://localhost:9002 | minioadmin / minioadmin123 |
-| **Grafana** | http://localhost:3001 | admin / admin |
-| **MLflow** | http://localhost:5000 | - |
-| **Redis** | localhost:6379 | - |
-| **Kafka** | localhost:9093 | - |
-| **Kafka UI** | http://localhost:8080 | - |
-| **Jupyter Lab** | http://localhost:8888 | token: hft123 |
-| **Superset** | http://localhost:8081 | admin / admin |
-| **Airflow** | http://localhost:8082 | admin / admin |
-| **Prometheus** | http://localhost:9092 | - |
-| **AlertManager** | http://localhost:9094 | - |
-| **Jaeger** | http://localhost:16686 | - |
-| **Elasticsearch** | http://localhost:9200 | - |
-| **Kibana** | http://localhost:5601 | - |
-| **Node Exporter** | http://localhost:9100 | - |
-| **ClickHouse Exporter** | http://localhost:9116 | - |
+* **Prometheus**
+  Сбор метрик со всех сервисов (ops-нод, баз данных, приложений). Источник данных для мониторинга и алёртов.
 
-## 🛠️ Management Commands
+* **Grafana**
+  Визуализация метрик и логов. Дашборды по состоянию collector/executor, БД, ops-сервисов, инфраструктуры.
 
-### Using Make (Recommended)
+* **Loki**
+  Хранилище логов (log aggregation). Принимает логи от promtail, даёт возможность удобно искать их через Grafana.
 
-```bash
-make help          # Show all available commands
-make start         # Start all services
-make stop          # Stop all services
-make clean         # Remove all data
-make status        # Show service status
-make migrate       # Run database migrations
-make test          # Run tests
-make mlflow-experiments  # Run MLflow experiments
-make logs          # Show all logs
-make logs-mlflow   # Show MLflow logs
-make restart       # Restart services
-```
+* **Promtail**
+  Агент сбора логов. Читает docker-логи контейнеров и отправляет их в Loki.
 
-### Using Scripts Directly
+* **Superset**
+  BI и аналитика. Делаем дашборды и аналитические отчёты по данным (стакан, трейды, фичи, PnL и т.д.).
 
-```bash
-./scripts/start.sh    # Start all services
-./scripts/stop.sh     # Stop all services
-./scripts/clean.sh    # Remove all data
-./scripts/status.sh   # Show status
-./scripts/migrate.sh  # Run migrations
-./scripts/test.sh     # Run tests
-```
+* **Reverse-proxy (Nginx)**
+  Единая точка входа к веб-интерфейсам (Grafana, Superset, MLflow, MinIO и др.). Упрощает маршрутизацию и в будущем — авторизацию/TLS.
 
-## 📁 Project Structure
-
-```
-okx-hft-infra/
-├── docker-compose/          # Local development environment
-│   ├── docker-compose.yml   # Main orchestration file
-│   ├── clickhouse/          # ClickHouse configuration
-│   ├── minio/              # MinIO configuration
-│   └── monitoring/         # Prometheus + Grafana
-├── clickhouse/             # Database schemas and logic
-│   ├── migrations/         # SQL migrations
-│   ├── seeds/             # Initial data
-│   ├── views/             # Materialized views
-│   ├── tests/             # Data quality tests
-│   └── tools/             # Python utilities
-├── scripts/               # Management scripts
-├── k8s/                   # Kubernetes manifests
-├── terraform/             # Infrastructure as Code
-├── ansible/               # Configuration management
-└── ci/                    # CI/CD pipelines
-```
-
-## 🗄️ Database Schema
-
-### Raw Data Tables
-
-- **`hft_data.raw_ticks`** - Raw tick data from OKX
-- **`hft_data.symbols`** - Trading symbols reference
-
-### Aggregated Data Tables
-
-- **`hft_analytics.agg_1s`** - 1-second aggregated data
-- **`hft_analytics.agg_1m`** - 1-minute aggregated data
-
-### Materialized Views
-
-- **`mv_agg_1s`** - Real-time 1-second aggregation
-- **`mv_agg_1m`** - Real-time 1-minute aggregation
-
-## 🔧 Development
-
-### Adding New Migrations
-
-1. Create new SQL file in `clickhouse/migrations/`
-2. Follow naming convention: `XXXX_description.sql`
-3. Run migrations: `make migrate`
-
-### Adding New Tests
-
-1. Add SQL queries to `clickhouse/tests/`
-2. Run tests: `make test`
-
-### Monitoring
-
-- **Grafana**: http://localhost:3001 (admin/admin)
-- **Prometheus**: http://localhost:9092
-- **AlertManager**: http://localhost:9094
-- **ClickHouse Metrics**: http://localhost:9116
-- **Node Exporter**: http://localhost:9100
-
-## 🚀 Production Deployment
-
-### Kubernetes
-
-```bash
-# Deploy to Kubernetes
-kubectl apply -f k8s/manifests/
-```
-
-### Terraform (Hetzner)
-
-```bash
-cd terraform/hetzner
-terraform init
-terraform plan
-terraform apply
-```
-
-### Ansible
-
-```bash
-# Deploy to servers
-ansible-playbook -i ansible/inventories/prod ansible/site.yml
-```
-
-## 📈 Performance
-
-- **Raw ticks**: ~1M rows/second ingestion
-- **Storage**: Compressed with LZ4
-- **Retention**: 30 days raw, 1 year aggregated
-- **Query performance**: Sub-second for most analytics
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-1. **Port conflicts**: Check if ports 8123, 9001, 9002, 9003, 3001, 5000, 6379, 8080, 8081, 8082, 9092, 9093, 9094, 9100, 9116, 9200, 5601, 16686 are free
-2. **Memory issues**: Ensure Docker has at least 4GB RAM (8GB recommended for all services)
-3. **Permission errors**: Run `chmod +x scripts/*.sh`
-4. **Service startup issues**: Check logs with `docker-compose logs <service-name>`
-
-### Logs
-
-```bash
-# View all logs
-make logs
-
-# View specific service logs
-make logs-clickhouse
-make logs-minio
-make logs-monitoring
-```
-
-### Reset Everything
-
-```bash
-make clean
-make setup
-```
-
-## 📚 Documentation
-
-- [ClickHouse Documentation](https://clickhouse.com/docs/)
-- [MinIO Documentation](https://docs.min.io/)
-- [Grafana Documentation](https://grafana.com/docs/)
-- [Prometheus Documentation](https://prometheus.io/docs/)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
