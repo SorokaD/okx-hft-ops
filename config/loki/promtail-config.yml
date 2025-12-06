@@ -20,4 +20,3 @@ scrape_configs:
     pipeline_stages:
       - docker:
 
-

@@ -1,0 +1,7 @@
+# MLflow with PostgreSQL and S3 support
+FROM ghcr.io/mlflow/mlflow:v2.16.0
+
+RUN pip install --no-cache-dir \
+    psycopg2-binary \
+    boto3
+

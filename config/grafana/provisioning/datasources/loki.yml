@@ -7,4 +7,3 @@ datasources:
     url: http://loki:3100
     editable: true
 
-

@@ -1,100 +1,211 @@
-OKX HFT Ops (okx-hft-ops)
+# OKX HFT Ops
 
-Назначение
-- Этот репозиторий — узел операций/инфраструктуры/мониторинга для пет‑проекта OKX HFT.
-- Здесь нет бизнес‑логики трейдинга — только инфраструктура, мониторинг и сопутствующие сервисы.
-- Связанные репозитории: `okx-hft-collector`, `okx-hft-executor`, `okx-hft-timescaledb`.
+Infrastructure-as-Code repository for the OKX HFT (High-Frequency Trading) pet project.
 
-Что входит
-- MinIO — объектное хранилище (артефакты, данные)
-- MLflow — трекинг ML‑экспериментов (артефакты в MinIO)
-- Prometheus — сбор метрик
-- Loki + Promtail — сбор и хранение логов контейнеров
-- Grafana — дашборды по метрикам и логам
-- Superset — BI/аналитика
-- Опционально: Nginx reverse‑proxy для доступа ко всем UI через один порт
+## 📁 Repository Structure
 
-Архитектура (Ops‑узел)
-- Общая сеть Docker: `hft_network`
-- Сервисы:
-  - `minio`: объектное хранилище (в т.ч. бакет `mlflow` для артефактов)
-  - `mlflow`: сервер экспериментов (SQLite backend, артефакты в S3/MinIO)
-  - `prometheus`: сбор метрик из сервисов
-  - `loki`: хранилище логов
-  - `promtail`: агент, отправляющий docker‑логи в Loki
-  - `grafana`: дашборды (datasource: Prometheus и Loki)
-  - `superset`: BI
-  - `reverse-proxy` (опция): единая точка входа по HTTP
+```
+okx-hft-ops/
+├── config/                          # Configuration files
+│   ├── grafana/                     # Grafana configuration
+│   │   ├── grafana.ini              # Main config
+│   │   ├── dashboards/              # Dashboard JSON files
+│   │   └── provisioning/            # Auto-provisioning (datasources, dashboards)
+│   ├── prometheus/                  # Prometheus configuration
+│   │   ├── prometheus.yml           # Scrape configs
+│   │   └── alert.rules.yml          # Alerting rules
+│   ├── loki/                        # Loki & Promtail configuration
+│   │   ├── loki-config.yml          # Loki config
+│   │   └── promtail-config.yml      # Promtail config
+│   └── superset/                    # Superset configuration
+│       └── superset_config.py       # Python config
+│
+├── docker/                          # Docker Compose stacks
+│   ├── docker-compose.traefik.yml   # Traefik reverse proxy + Let's Encrypt
+│   ├── docker-compose.portainer.yaml# Portainer container management
+│   ├── docker-compose.stack.yaml    # Monitoring: Prometheus, Grafana, Loki, Promtail
+│   └── docker-compose.ml.yaml       # ML Platform: MinIO, MLflow, Superset, Airflow
+│
+├── airflow/                         # Airflow DAGs, logs, plugins
+│   ├── dags/                        # DAG definitions
+│   ├── logs/                        # Airflow logs (gitignored)
+│   └── plugins/                     # Custom plugins
+│
+├── Dockerfile.mlflow                # Custom MLflow image with psycopg2 + boto3
+├── Dockerfile.superset              # Custom Superset image with psycopg2
+├── .env.example                     # Environment variables template
+└── README.md                        # This file
+```
 
-Быстрый старт (локально)
-1) Подготовить окружение:
-   - Скопируйте `.env.example` в `.env` и задайте надёжные секреты.
-2) Запустить стек:
-   - `docker compose up -d`
-3) Доступ к UI (порты/пути по умолчанию):
-   - Grafana: через reverse‑proxy http://localhost:8080/grafana (прямой порт 3000 не публикуется)
-   - Prometheus: http://localhost:9090
-   - Loki (API): http://localhost:3100
-   - MLflow: http://localhost:5000 (или через reverse‑proxy http://localhost:8080/mlflow)
-   - MinIO Console: http://localhost:9001, S3 endpoint: http://localhost:9000 (или http://localhost:8080/minio)
-   - Superset: http://localhost:8088 (или через reverse‑proxy http://localhost:8080/superset)
+## 🚀 Quick Start
 
-Примечания
-- Для MLflow требуется бакет `mlflow` в MinIO. Создайте его один раз в консоли MinIO (http://localhost:9001).
-- Grafana автоматически провиженит источники данных (Prometheus, Loki) и подхватывает дашборды из `grafana/dashboards/`.
-- Promtail собирает логи всех docker‑контейнеров хоста и отправляет их в Loki.
-- Prometheus пытается скрапить стандартные эндпоинты сервисов; если сервис не экспортирует метрики, он может быть в состоянии DOWN — это ожидаемо.
+### Prerequisites
 
-Следующие шаги
-- Airflow стек в `airflow/` с примерными DAG’ами
-- Отдельные docker‑compose файлы для MLflow и Superset в `mlflow/` и `superset/`
-- IaC: `terraform/` (Hetzner Cloud пример) и `ansible/` (bootstrap роли)
+- Docker & Docker Compose v2
+- Domain pointing to your server (*.tumar.tech in this example)
 
-Сервисы и порты (по умолчанию)
-- MinIO API: 9000, MinIO Console: 9001
-- MLflow: 5000
-- Prometheus: 9090
-- Loki: 3100
-- Grafana: доступ через reverse‑proxy на 8080 (`/grafana`) — прямой порт не маппится
-- Superset: 8088
-- Reverse‑proxy (опция): 8080
+### 1. Create External Network
 
-Переменные окружения
-- Все чувствительные значения задаются через `.env` (см. шаблон `.env.example`).
-- Для MLflow артефактов используются `MLFLOW_S3_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `MLFLOW_ARTIFACT_ROOT`.
+All services communicate through a shared external network `web`:
 
-Обновления
-- Стек ориентирован на локальный запуск для разработки/отладки инфраструктуры OKX HFT.
-- В продакшене предусмотрено вынесение сервисов, хранение данных на выделенных томах, мониторинг и алертинг через Prometheus/Grafana, логи в Loki.
+```bash
+docker network create web || true
+```
 
+### 2. Configure Environment
 
+```bash
+cp .env.example .env
+# Edit .env with your actual secrets and passwords
+```
 
----
-Вот короткие описания.  
+**Generate secure keys:**
+```bash
+# Fernet key for Airflow
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-### Сервисы `okx-hft-ops`
+# Random secret key
+openssl rand -hex 32
+```
 
-* **MinIO**
-  Объектное хранилище (аналог S3). Храним артефакты ML (модели, датасеты, логи), к нему ходит MLflow как в S3.
+### 3. Deploy Stacks
 
-* **MLflow**
-  Трекер экспериментов и реестр моделей. Логируем метрики, параметры, версии моделей, сохраняем артефакты в MinIO.
+Deploy in order (Traefik should be first):
 
-* **Prometheus**
-  Сбор метрик со всех сервисов (ops-нод, баз данных, приложений). Источник данных для мониторинга и алёртов.
+```bash
+# 1. Traefik (reverse proxy, SSL termination)
+docker compose -f docker/docker-compose.traefik.yml up -d
 
-* **Grafana**
-  Визуализация метрик и логов. Дашборды по состоянию collector/executor, БД, ops-сервисов, инфраструктуры.
+# 2. Portainer (optional, container management UI)
+docker compose -f docker/docker-compose.portainer.yaml up -d
 
-* **Loki**
-  Хранилище логов (log aggregation). Принимает логи от promtail, даёт возможность удобно искать их через Grafana.
+# 3. Monitoring Stack (Prometheus, Grafana, Loki, Promtail)
+docker compose -f docker/docker-compose.stack.yaml --env-file .env up -d
 
-* **Promtail**
-  Агент сбора логов. Читает docker-логи контейнеров и отправляет их в Loki.
+# 4. ML Platform (MinIO, MLflow, Superset, Airflow)
+docker compose -f docker/docker-compose.ml.yaml --env-file .env up -d
+```
 
-* **Superset**
-  BI и аналитика. Делаем дашборды и аналитические отчёты по данным (стакан, трейды, фичи, PnL и т.д.).
+### 4. Initialize Superset (first time only)
 
-* **Reverse-proxy (Nginx)**
-  Единая точка входа к веб-интерфейсам (Grafana, Superset, MLflow, MinIO и др.). Упрощает маршрутизацию и в будущем — авторизацию/TLS.
+After Superset container is healthy, create admin user:
 
+```bash
+# Load environment variables
+source .env
+
+# Create admin user
+docker exec superset superset fab create-admin \
+  --username "$SUPERSET_ADMIN_USER" \
+  --firstname Admin \
+  --lastname User \
+  --email admin@example.com \
+  --password "$SUPERSET_ADMIN_PASSWORD"
+
+# Initialize database
+docker exec superset superset db upgrade
+docker exec superset superset init
+```
+
+## 🌐 Service Endpoints
+
+After deployment, services are available at:
+
+| Service    | URL                           | Description                        |
+|------------|-------------------------------|------------------------------------|
+| Traefik    | https://traefik.tumar.tech    | Reverse proxy dashboard            |
+| Portainer  | https://portainer.tumar.tech  | Container management UI            |
+| Grafana    | https://grafana.tumar.tech    | Metrics visualization & dashboards |
+| Prometheus | https://prometheus.tumar.tech | Metrics storage & alerting         |
+| MLflow     | https://mlflow.tumar.tech     | ML experiment tracking             |
+| MinIO      | https://minio.tumar.tech      | S3-compatible object storage (UI)  |
+| MinIO S3   | https://s3.tumar.tech         | S3 API endpoint                    |
+| Superset   | https://superset.tumar.tech   | Data exploration & visualization   |
+| Airflow    | https://airflow.tumar.tech    | Workflow orchestration             |
+
+### Local Development Ports
+
+For local testing without Traefik:
+
+| Service    | Local URL              |
+|------------|------------------------|
+| Grafana    | http://localhost:3000  |
+| Prometheus | http://localhost:9090  |
+| MinIO      | http://localhost:9001  |
+| MinIO S3   | http://localhost:9000  |
+| MLflow     | http://localhost:5050  |
+| Superset   | http://localhost:8088  |
+| Airflow    | http://localhost:8080  |
+
+## 📊 Stack Components
+
+### Monitoring Stack (`docker-compose.stack.yaml`)
+
+- **Prometheus** — Time-series database for metrics
+- **Grafana** — Dashboards and visualization (credentials from `.env`)
+- **Loki** — Log aggregation system
+- **Promtail** — Log shipper (collects Docker logs)
+
+### ML Platform (`docker-compose.ml.yaml`)
+
+- **MinIO** — S3-compatible object storage for artifacts
+- **MLflow** — ML experiment tracking and model registry (PostgreSQL backend)
+- **Superset** — Business intelligence and data visualization
+- **Airflow** — Workflow orchestration for data pipelines (LocalExecutor)
+
+## 🔧 Management Commands
+
+### View Logs
+
+```bash
+# All services in a stack
+docker compose -f docker/docker-compose.stack.yaml logs -f
+
+# Specific service
+docker logs -f grafana
+docker logs -f mlflow
+```
+
+### Stop Stacks
+
+```bash
+docker compose -f docker/docker-compose.ml.yaml down
+docker compose -f docker/docker-compose.stack.yaml down
+docker compose -f docker/docker-compose.portainer.yaml down
+docker compose -f docker/docker-compose.traefik.yml down
+```
+
+### Reset with Data Loss
+
+```bash
+# Stop and remove volumes (DESTROYS DATA)
+docker compose -f docker/docker-compose.ml.yaml down -v
+docker compose -f docker/docker-compose.stack.yaml down -v
+```
+
+### Update Images
+
+```bash
+docker compose -f docker/docker-compose.stack.yaml pull
+docker compose -f docker/docker-compose.stack.yaml up -d
+```
+
+## 🔐 Security Notes
+
+1. **Change all default passwords** in `.env` before deploying to production
+2. **Traefik dashboard** is protected with Basic Auth
+3. **Prometheus** is protected with Basic Auth
+4. **MLflow** has no built-in auth — consider adding Traefik middleware
+5. Credentials are stored in `.env` file — **do not commit it to git**
+
+## 📝 Notes
+
+- Grafana datasources (Prometheus, Loki) are auto-provisioned via `config/grafana/provisioning/`
+- Airflow uses LocalExecutor (no Redis/Celery) — suitable for small workloads
+- MLflow stores artifacts in MinIO via S3 API
+- All databases use PostgreSQL 16-alpine
+- Superset admin user must be created manually after first deployment
+
+## 🤝 Contributing
+
+This is a personal pet project, but feel free to fork and adapt for your needs.

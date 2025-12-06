@@ -1,0 +1,275 @@
+# ============================================
+# Data/ML Platform: MinIO, MLflow, Superset, Airflow
+# ============================================
+# Usage:
+#   docker compose -f docker/docker-compose.ml.yaml --env-file .env up -d
+# ============================================
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.10.2
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY:-}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@airflow-db:5432/${AIRFLOW_DB_NAME:-airflow}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-secret}
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    # S3/MinIO connection for remote logging (optional)
+    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+  volumes:
+    - ../airflow/dags:/opt/airflow/dags
+    - ../airflow/logs:/opt/airflow/logs
+    - ../airflow/plugins:/opt/airflow/plugins
+  networks:
+    - internal
+  depends_on:
+    airflow-db:
+      condition: service_healthy
+
+services:
+  # ==================== Databases ====================
+
+  mlflow-db:
+    image: postgres:16-alpine
+    container_name: mlflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MLFLOW_DB_USER:-mlflow}
+      POSTGRES_PASSWORD: ${MLFLOW_DB_PASSWORD:-mlflow}
+      POSTGRES_DB: ${MLFLOW_DB_NAME:-mlflow}
+    volumes:
+      - mlflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MLFLOW_DB_USER:-mlflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  superset-db:
+    image: postgres:16-alpine
+    container_name: superset-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SUPERSET_DB_USER:-superset}
+      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD:-superset}
+      POSTGRES_DB: ${SUPERSET_DB_NAME:-superset}
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_DB_USER:-superset}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  airflow-db:
+    image: postgres:16-alpine
+    container_name: airflow-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER:-airflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # ==================== MinIO (S3-compatible storage) ====================
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-10-29T16-01-48Z
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001" --address ":9000"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    labels:
+      - "traefik.enable=true"
+      # MinIO Console (Web UI)
+      - "traefik.http.routers.minio-console.rule=Host(`minio.tumar.tech`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+      # MinIO S3 API
+      - "traefik.http.routers.minio-s3.rule=Host(`s3.tumar.tech`)"
+      - "traefik.http.routers.minio-s3.entrypoints=websecure"
+      - "traefik.http.routers.minio-s3.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio-s3.service=minio-s3"
+      - "traefik.http.services.minio-s3.loadbalancer.server.port=9000"
+    networks:
+      - web
+      - internal
+
+  # ==================== MLflow ====================
+
+  mlflow:
+    build:
+      context: ..
+      dockerfile: Dockerfile.mlflow
+    image: okx-hft-ops-mlflow:latest
+    container_name: mlflow
+    restart: unless-stopped
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
+      MLFLOW_BACKEND_STORE_URI: postgresql://${MLFLOW_DB_USER:-mlflow}:${MLFLOW_DB_PASSWORD:-mlflow}@mlflow-db:5432/${MLFLOW_DB_NAME:-mlflow}
+      MLFLOW_ARTIFACT_ROOT: s3://mlflow/
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql://${MLFLOW_DB_USER:-mlflow}:${MLFLOW_DB_PASSWORD:-mlflow}@mlflow-db:5432/${MLFLOW_DB_NAME:-mlflow}
+      --artifacts-destination s3://mlflow/
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5050:5000"   # MLflow UI (5000 занят на macOS AirPlay)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mlflow.rule=Host(`mlflow.tumar.tech`)"
+      - "traefik.http.routers.mlflow.entrypoints=websecure"
+      - "traefik.http.routers.mlflow.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mlflow.loadbalancer.server.port=5000"
+    networks:
+      - web
+      - internal
+    depends_on:
+      mlflow-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # ==================== Superset ====================
+
+  superset:
+    build:
+      context: ..
+      dockerfile: Dockerfile.superset
+    image: okx-hft-ops-superset:latest
+    container_name: superset
+    restart: unless-stopped
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-please_change_this_secret_key}
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD:-superset}@superset-db:5432/${SUPERSET_DB_NAME:-superset}
+      SUPERSET_LOAD_EXAMPLES: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8088/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 15
+    volumes:
+      - superset_home:/app/superset_home
+      - ../config/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    ports:
+      - "8088:8088"   # Superset UI
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.superset.rule=Host(`superset.tumar.tech`)"
+      - "traefik.http.routers.superset.entrypoints=websecure"
+      - "traefik.http.routers.superset.tls.certresolver=letsencrypt"
+      - "traefik.http.services.superset.loadbalancer.server.port=8088"
+    networks:
+      - web
+      - internal
+    depends_on:
+      superset-db:
+        condition: service_healthy
+
+  # ==================== Airflow ====================
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username ${AIRFLOW_ADMIN_USER:-admin} \
+          --firstname ${AIRFLOW_ADMIN_FIRSTNAME:-Admin} \
+          --lastname ${AIRFLOW_ADMIN_LASTNAME:-User} \
+          --role Admin \
+          --email ${AIRFLOW_ADMIN_EMAIL:-admin@example.com} \
+          --password ${AIRFLOW_ADMIN_PASSWORD:-admin} || true
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    ports:
+      - "8080:8080"   # Airflow UI
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.airflow.rule=Host(`airflow.tumar.tech`)"
+      - "traefik.http.routers.airflow.entrypoints=websecure"
+      - "traefik.http.routers.airflow.tls.certresolver=letsencrypt"
+      - "traefik.http.services.airflow.loadbalancer.server.port=8080"
+    networks:
+      - web
+      - internal
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname) || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+networks:
+  web:
+    external: true
+  internal:
+    driver: bridge
+
+volumes:
+  minio_data:
+  mlflow_db_data:
+  superset_db_data:
+  superset_home:
+  airflow_db_data:

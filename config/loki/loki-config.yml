@@ -40,4 +40,3 @@ query_scheduler:
 frontend:
   max_outstanding_per_tenant: 100
 
-
