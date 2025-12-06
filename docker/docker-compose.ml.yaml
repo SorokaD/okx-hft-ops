@@ -171,6 +171,40 @@ services:
 
   # ==================== Superset ====================
 
+  superset-init:
+    build:
+      context: ..
+      dockerfile: Dockerfile.superset
+    image: okx-hft-ops-superset:latest
+    container_name: superset-init
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-please_change_this_secret_key}
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD:-superset}@superset-db:5432/${SUPERSET_DB_NAME:-superset}
+      ADMIN_USERNAME: ${SUPERSET_ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@example.com}
+    volumes:
+      - superset_home:/app/superset_home
+      - ../config/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+    command:
+      - /bin/bash
+      - -c
+      - |
+        superset db upgrade
+        superset fab create-admin \
+          --username "$$ADMIN_USERNAME" \
+          --firstname Admin \
+          --lastname User \
+          --email "$$ADMIN_EMAIL" \
+          --password "$$ADMIN_PASSWORD" || true
+        superset init
+    restart: "no"
+    networks:
+      - internal
+    depends_on:
+      superset-db:
+        condition: service_healthy
+
   superset:
     build:
       context: ..
@@ -203,8 +237,8 @@ services:
       - web
       - internal
     depends_on:
-      superset-db:
-        condition: service_healthy
+      superset-init:
+        condition: service_completed_successfully
 
   # ==================== Airflow ====================
 
