@@ -63,6 +63,7 @@ services:
     #  - "3000:3000"   # Grafana UI
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.grafana.rule=Host(`grafana.tumar.tech`)"
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"

@@ -108,6 +108,7 @@ services:
       - "9001:9001"   # Console UI
     labels:
       - "traefik.enable=true" 
+      - "traefik.docker.network=web"
       # MinIO Console (Web UI)
       - "traefik.http.routers.minio-console.rule=Host(`minio.tumar.tech`)"
       - "traefik.http.routers.minio-console.entrypoints=websecure"
@@ -120,7 +121,6 @@ services:
       - "traefik.http.routers.minio-s3.tls.certresolver=letsencrypt"
       - "traefik.http.routers.minio-s3.service=minio-s3"
       - "traefik.http.services.minio-s3.loadbalancer.server.port=9000"
-      - "traefik.docker.network=web"
     networks:
       - web
       - internal
@@ -155,11 +155,11 @@ services:
       - "5050:5000"   # MLflow UI (5000 занят на macOS AirPlay)
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.mlflow.rule=Host(`mlflow.tumar.tech`)"
       - "traefik.http.routers.mlflow.entrypoints=websecure"
       - "traefik.http.routers.mlflow.tls.certresolver=letsencrypt"
       - "traefik.http.services.mlflow.loadbalancer.server.port=5000"
-      - "traefik.docker.network=web"
     networks:
       - web
       - internal
@@ -194,11 +194,11 @@ services:
       - "8088:8088"   # Superset UI
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.superset.rule=Host(`superset.tumar.tech`)"
       - "traefik.http.routers.superset.entrypoints=websecure"
       - "traefik.http.routers.superset.tls.certresolver=letsencrypt"
       - "traefik.http.services.superset.loadbalancer.server.port=8088"
-      - "traefik.docker.network=web"
     networks:
       - web
       - internal
@@ -239,11 +239,11 @@ services:
       - "8080:8080"   # Airflow UI
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.airflow.rule=Host(`airflow.tumar.tech`)"
       - "traefik.http.routers.airflow.entrypoints=websecure"
       - "traefik.http.routers.airflow.tls.certresolver=letsencrypt"
       - "traefik.http.services.airflow.loadbalancer.server.port=8080"
-      - "traefik.docker.network=web"
     networks:
       - web
       - internal
