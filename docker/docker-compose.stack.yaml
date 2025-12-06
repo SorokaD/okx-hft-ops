@@ -24,8 +24,8 @@ services:
       - ../config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../config/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"   # Prometheus UI
+    #ports:
+    #  - "9090:9090"   # Prometheus UI
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.tumar.tech`)"
@@ -58,8 +58,8 @@ services:
       - ../config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../config/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - "3000:3000"   # Grafana UI
+    #ports:
+    #  - "3000:3000"   # Grafana UI
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana.rule=Host(`grafana.tumar.tech`)"
