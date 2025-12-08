@@ -1,7 +1,37 @@
-# Берём официальный образ Superset
-FROM apache/superset:latest
+# ============================================
+# Superset для HFT/Crypto Analytics (Tumar HFT)
+# ============================================
+# Расширенный образ Apache Superset с поддержкой:
+# - TimescaleDB/PostgreSQL для HFT-данных
+# - ECharts визуализации (heatmap, dual-axis, histogram)
+# ============================================
 
+FROM apache/superset:4.0.1
+
+# Переключаемся на root для установки системных зависимостей
 USER root
-RUN python -m ensurepip --upgrade && \
-    python -m pip install --no-cache-dir psycopg2-binary
+
+# Устанавливаем системные зависимости для сборки Python-пакетов
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем Python-зависимости для HFT-аналитики
+# ВАЖНО: Версии должны быть совместимы с Superset 4.0.1:
+# - pyarrow: <15,>=14.0.1
+# - redis: <5.0,>=4.5.4
+# - sqlalchemy-utils: <0.39,>=0.38.3
+# --------------------------------------------------
+# psycopg2-binary: PostgreSQL/TimescaleDB драйвер (обновляем minor)
+# --------------------------------------------------
+RUN pip install --no-cache-dir \
+    psycopg2-binary==2.9.9
+
+# Возвращаемся к пользователю superset для безопасности
 USER superset
+
+# Метаданные образа
+LABEL maintainer="Tumar HFT Team" \
+      description="Apache Superset optimized for HFT/Crypto analytics" \
+      version="1.0.0"
