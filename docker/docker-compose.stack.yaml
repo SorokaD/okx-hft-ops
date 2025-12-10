@@ -54,8 +54,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
-      # HTTPS configuration
-      GF_SERVER_PROTOCOL: "https"
+      # Server configuration (Traefik terminates TLS, Grafana listens on HTTP internally)
       GF_SERVER_DOMAIN: "grafana.tumar.tech"
       GF_SERVER_ROOT_URL: "https://grafana.tumar.tech/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "false"
