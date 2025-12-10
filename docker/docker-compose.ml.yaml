@@ -159,7 +159,7 @@ services:
       --backend-store-uri postgresql://${MLFLOW_DB_USER:-mlflow}:${MLFLOW_DB_PASSWORD:-mlflow}@mlflow-db:5432/${MLFLOW_DB_NAME:-mlflow}
       --artifacts-destination s3://mlflow/
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/ || exit 1"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:5000/\")' || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
