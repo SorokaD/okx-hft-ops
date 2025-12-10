@@ -54,8 +54,17 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # HTTPS configuration
+      GF_SERVER_PROTOCOL: "https"
+      GF_SERVER_DOMAIN: "grafana.tumar.tech"
       GF_SERVER_ROOT_URL: "https://grafana.tumar.tech/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      # Security: enforce HTTPS
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS: "31536000"
+      GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
+      GF_SECURITY_X_XSS_PROTECTION: "true"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
       interval: 15s
@@ -76,6 +85,16 @@ services:
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      # Security headers middleware
+      - "traefik.http.routers.grafana.middlewares=grafana-security"
+      - "traefik.http.middlewares.grafana-security.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.grafana-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.grafana-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.grafana-security.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.grafana-security.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.grafana-security.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.grafana-security.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.grafana-security.headers.customFrameOptionsValue=SAMEORIGIN"
     networks:
       - web
       - internal
