@@ -29,6 +29,16 @@ services:
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      # Security headers middleware
+      - "traefik.http.routers.portainer.middlewares=portainer-security"
+      - "traefik.http.middlewares.portainer-security.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.portainer-security.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.portainer-security.headers.stsPreload=true"
+      - "traefik.http.middlewares.portainer-security.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.portainer-security.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.portainer-security.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.portainer-security.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.portainer-security.headers.customFrameOptionsValue=SAMEORIGIN"
     networks:
       - web
 
