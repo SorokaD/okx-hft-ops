@@ -3,6 +3,11 @@
 # ============================================
 # Usage:
 #   docker compose -f docker/docker-compose.portainer.yaml up -d
+#
+# Pre-requisites:
+#   1. Network 'web' exists: docker network create web
+#   2. Traefik is running: docker compose -f docker/docker-compose.traefik.yaml up -d
+#   3. Create data directory: sudo mkdir -p /opt/portainer/data
 # ============================================
 
 services:
@@ -12,9 +17,14 @@ services:
     restart: unless-stopped
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "/opt/portainer/data:/data"
+      - "portainer_data:/data"
+    # Порты закомментированы - доступ только через Traefik
+    # ports:
+    #   - "9443:9443"  # Portainer HTTPS UI
+    #   - "9000:9000"  # Portainer HTTP UI
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.portainer.rule=Host(`portainer.tumar.tech`)"
       - "traefik.http.routers.portainer.entrypoints=websecure"
       - "traefik.http.routers.portainer.tls.certresolver=letsencrypt"
@@ -25,3 +35,7 @@ services:
 networks:
   web:
     external: true
+
+volumes:
+  portainer_data:
+    driver: local

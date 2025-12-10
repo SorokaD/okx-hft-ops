@@ -2,7 +2,12 @@
 # Traefik Reverse Proxy + Let's Encrypt
 # ============================================
 # Usage:
-#   docker compose -f docker/docker-compose.traefik.yml up -d
+#   docker compose -f docker/docker-compose.traefik.yaml up -d
+#
+# Pre-requisites:
+#   1. Create network: docker network create web
+#   2. Create acme.json: touch letsencrypt/acme.json && chmod 600 letsencrypt/acme.json
+#   3. DNS A-records pointing to this server for all subdomains
 # ============================================
 
 services:
@@ -11,36 +16,57 @@ services:
     container_name: traefik
     restart: unless-stopped
     command:
+      # API & Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      
+      # Docker provider
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web"
+      
+      # Entrypoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      
+      # HTTP → HTTPS redirect (global)
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      
+      # Let's Encrypt ACME (HTTP Challenge)
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.letsencrypt.acme.email=dmitrii.n.soroka@gmail.com"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
-      - "--api.dashboard=true"
-    environment:
-      - DOCKER_HOST=unix:///var/run/docker.sock
+      
+      # Logging (debug для диагностики, потом можно сменить на INFO)
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./letsencrypt:/letsencrypt"
+      - "traefik_letsencrypt:/letsencrypt"
     labels:
       - "traefik.enable=true"
-      # роутер для дашборда Traefik
-      - "traefik.http.routers.traefik.rule=Host(`traefik.tumar.tech`)"
-      - "traefik.http.routers.traefik.entrypoints=websecure"
-      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
-      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
-      # basic auth
-      - "traefik.http.routers.traefik.middlewares=traefik-auth"
-      - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$2y$05$3iNV8ewkLnP5kJvVwsRcMueoDIH8NCnQ3ydx.DRBmtjUb.K4eodTS"
+      
+      # Dashboard router
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.tumar.tech`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      
+      # Basic auth for dashboard
+      - "traefik.http.routers.traefik-dashboard.middlewares=traefik-auth"
+      # Password: admin (generate new with: htpasswd -nbB admin "your_password")
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2y$$05$$3iNV8ewkLnP5kJvVwsRcMueoDIH8NCnQ3ydx.DRBmtjUb.K4eodTS"
     networks:
       - web
 
+  # Test service to verify Traefik is working
   whoami:
     image: traefik/whoami
     container_name: whoami
@@ -50,9 +76,14 @@ services:
       - "traefik.http.routers.whoami.rule=Host(`ops.tumar.tech`)"
       - "traefik.http.routers.whoami.entrypoints=websecure"
       - "traefik.http.routers.whoami.tls.certresolver=letsencrypt"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
     networks:
       - web
 
 networks:
   web:
     external: true
+
+volumes:
+  traefik_letsencrypt:
+    driver: local
