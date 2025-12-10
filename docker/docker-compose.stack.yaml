@@ -3,6 +3,10 @@
 # ============================================
 # Usage:
 #   docker compose -f docker/docker-compose.stack.yaml --env-file .env up -d
+#
+# Pre-requisites:
+#   1. Network 'web' exists: docker network create web
+#   2. Traefik is running: docker compose -f docker/docker-compose.traefik.yaml up -d
 # ============================================
 
 services:
@@ -15,6 +19,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
+      - "--web.external-url=https://prometheus.tumar.tech"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
       interval: 15s
@@ -24,16 +29,17 @@ services:
       - ../config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../config/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus_data:/prometheus
-    #ports:
-    #  - "9090:9090"   # Prometheus UI
+    # Порты закомментированы - доступ только через Traefik
+    # ports:
+    #   - "9090:9090"   # Prometheus UI
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.tumar.tech`)"
       - "traefik.http.routers.prometheus.entrypoints=websecure"
       - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
-      - "traefik.docker.network=web"
-      # Basic auth middleware (same as traefik dashboard)
+      # Basic auth middleware
       - "traefik.http.routers.prometheus.middlewares=prometheus-auth"
       - "traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASIC_AUTH:-admin:$$2y$$05$$3iNV8ewkLnP5kJvVwsRcMueoDIH8NCnQ3ydx.DRBmtjUb.K4eodTS}"
     networks:
@@ -49,6 +55,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_SERVER_ROOT_URL: "https://grafana.tumar.tech/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
       interval: 15s
@@ -59,8 +66,9 @@ services:
       - ../config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../config/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    #ports:
-    #  - "3000:3000"   # Grafana UI
+    # Порты закомментированы - доступ только через Traefik
+    # ports:
+    #   - "3000:3000"   # Grafana UI
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
@@ -68,7 +76,6 @@ services:
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-      - "traefik.docker.network=web"
     networks:
       - web
       - internal
