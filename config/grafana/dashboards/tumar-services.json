@@ -94,7 +94,7 @@
       "gridPos": {"h": 3, "w": 3, "x": 12, "y": 2},
       "id": 5,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "up{job=\"minio\"}", "legendFormat": "MinIO", "refId": "A"}],
+      "targets": [{"expr": "probe_success{instance=~\".*minio.*\"}", "legendFormat": "MinIO", "refId": "A"}],
       "title": "MinIO",
       "type": "stat"
     },
@@ -111,7 +111,7 @@
       "gridPos": {"h": 3, "w": 3, "x": 15, "y": 2},
       "id": 6,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "up{job=\"mlflow\"}", "legendFormat": "MLflow", "refId": "A"}],
+      "targets": [{"expr": "probe_success{instance=~\".*mlflow.*\"}", "legendFormat": "MLflow", "refId": "A"}],
       "title": "MLflow",
       "type": "stat"
     },
@@ -128,7 +128,7 @@
       "gridPos": {"h": 3, "w": 3, "x": 18, "y": 2},
       "id": 7,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "up{job=\"superset\"}", "legendFormat": "Superset", "refId": "A"}],
+      "targets": [{"expr": "probe_success{instance=~\".*superset.*\"}", "legendFormat": "Superset", "refId": "A"}],
       "title": "Superset",
       "type": "stat"
     },
@@ -145,7 +145,7 @@
       "gridPos": {"h": 3, "w": 3, "x": 21, "y": 2},
       "id": 8,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "up{job=\"airflow\"}", "legendFormat": "Airflow", "refId": "A"}],
+      "targets": [{"expr": "probe_success{instance=~\".*airflow.*\"}", "legendFormat": "Airflow", "refId": "A"}],
       "title": "Airflow",
       "type": "stat"
     },

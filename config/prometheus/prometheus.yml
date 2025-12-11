@@ -106,14 +106,34 @@ scrape_configs:
           service: 'minio-bucket'
           node: 'ops'
 
-  # ==================== Services without native Prometheus metrics ====================
-  # MLflow, Superset, Airflow don't expose /metrics endpoints
-  # Their metrics are available via cAdvisor (container CPU, memory, network)
-  # 
-  # To monitor their health, use:
-  # - Blackbox exporter (HTTP probes) - optional, add later if needed
-  # - Container metrics from cAdvisor job
-  # - Keep-alive service logs in Loki
+  # ==================== HTTP Probes (Blackbox Exporter) ====================
+  - job_name: 'blackbox_http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://superset.tumar.tech/health
+          - https://mlflow.tumar.tech/
+          - https://airflow.tumar.tech/health
+          - https://minio.tumar.tech/
+          - https://grafana.tumar.tech/api/health
+          - https://prometheus.tumar.tech/-/healthy
+          - https://portainer.tumar.tech/
+          - https://traefik.tumar.tech/
+        labels:
+          node: 'ops'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+      - source_labels: [__param_target]
+        regex: 'https://([^/]+).*'
+        target_label: service
+        replacement: '${1}'
 
   # ==================== PostgreSQL Databases (ops node) ====================
   

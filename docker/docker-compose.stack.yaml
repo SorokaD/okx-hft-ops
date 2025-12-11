@@ -203,6 +203,19 @@ services:
     depends_on:
       - loki
 
+  # ==================== Blackbox Exporter (HTTP Probes) ====================
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yml"
+    volumes:
+      - ../config/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks:
+      - internal
+      - web
+
   # ==================== Postgres Exporter (for ops DBs) ====================
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
