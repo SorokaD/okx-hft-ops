@@ -99,39 +99,14 @@ scrape_configs:
           service: 'minio-bucket'
           node: 'ops'
 
-  # MLflow - basic health check (no native Prometheus metrics)
-  # Container metrics available via cAdvisor
-  - job_name: 'mlflow'
-    metrics_path: /
-    scrape_interval: 30s
-    scrape_timeout: 10s
-    static_configs:
-      - targets: ['mlflow:5000']
-        labels:
-          service: 'mlflow'
-          node: 'ops'
-    # MLflow doesn't expose /metrics, this just checks if it's alive
-    # Real metrics come from cAdvisor
-
-  # Superset - health endpoint
-  - job_name: 'superset'
-    metrics_path: /health
-    scrape_interval: 30s
-    static_configs:
-      - targets: ['superset:8088']
-        labels:
-          service: 'superset'
-          node: 'ops'
-
-  # Airflow - health endpoint  
-  - job_name: 'airflow'
-    metrics_path: /health
-    scrape_interval: 30s
-    static_configs:
-      - targets: ['airflow-webserver:8080']
-        labels:
-          service: 'airflow'
-          node: 'ops'
+  # ==================== Services without native Prometheus metrics ====================
+  # MLflow, Superset, Airflow don't expose /metrics endpoints
+  # Their metrics are available via cAdvisor (container CPU, memory, network)
+  # 
+  # To monitor their health, use:
+  # - Blackbox exporter (HTTP probes) - optional, add later if needed
+  # - Container metrics from cAdvisor job
+  # - Keep-alive service logs in Loki
 
   # ==================== PostgreSQL Databases (ops node) ====================
   
