@@ -1,13 +1,12 @@
 # ============================================
-# Traefik Reverse Proxy + Let's Encrypt
+# Traefik Reverse Proxy + Let's Encrypt + Prometheus Metrics
 # ============================================
 # Usage:
 #   docker compose -f docker/docker-compose.traefik.yaml up -d
 #
 # Pre-requisites:
 #   1. Create network: docker network create web
-#   2. Create acme.json: touch letsencrypt/acme.json && chmod 600 letsencrypt/acme.json
-#   3. DNS A-records pointing to this server for all subdomains
+#   2. DNS A-records pointing to this server for all subdomains
 # ============================================
 
 services:
@@ -28,6 +27,7 @@ services:
       # Entrypoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.metrics.address=:8082"
       
       # HTTP → HTTPS redirect (global)
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
@@ -40,13 +40,22 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=dmitrii.n.soroka@gmail.com"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       
-      # Logging (debug для диагностики, потом можно сменить на INFO)
+      # Prometheus Metrics
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entrypoint=metrics"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+      
+      # Logging
       - "--log.level=INFO"
       - "--accesslog=true"
+      - "--accesslog.format=json"
       
     ports:
       - "80:80"
       - "443:443"
+      - "8082:8082"  # Prometheus metrics (internal only, firewall this port!)
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik_letsencrypt:/letsencrypt"

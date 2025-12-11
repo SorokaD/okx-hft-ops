@@ -1,5 +1,6 @@
 # ============================================
 # Monitoring Stack: Prometheus, Grafana, Loki, Promtail
+# + Node Exporter, cAdvisor, Keep-alive
 # ============================================
 # Usage:
 #   docker compose -f docker/docker-compose.stack.yaml --env-file .env up -d
@@ -10,16 +11,46 @@
 # ============================================
 
 services:
+  # ==================== Keep-alive Service ====================
+  keepalive:
+    image: python:3.11-alpine
+    container_name: keepalive
+    restart: unless-stopped
+    working_dir: /app
+    command: ["python", "-u", "/app/keepalive.py"]
+    environment:
+      KEEPALIVE_URLS: >-
+        https://superset.tumar.tech/health,
+        https://airflow.tumar.tech/health,
+        https://mlflow.tumar.tech/,
+        https://minio.tumar.tech/,
+        https://grafana.tumar.tech/api/health,
+        https://prometheus.tumar.tech/-/healthy,
+        https://portainer.tumar.tech/,
+        https://traefik.tumar.tech/
+      KEEPALIVE_INTERVAL_SECONDS: ${KEEPALIVE_INTERVAL_SECONDS:-120}
+      KEEPALIVE_TIMEOUT_SECONDS: ${KEEPALIVE_TIMEOUT_SECONDS:-10}
+      KEEPALIVE_LOG_LEVEL: ${KEEPALIVE_LOG_LEVEL:-INFO}
+    volumes:
+      - ../scripts/keepalive.py:/app/keepalive.py:ro
+    networks:
+      - web
+    labels:
+      - "logging=promtail"
+
+  # ==================== Prometheus ====================
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: prometheus
     restart: unless-stopped
+    user: "nobody"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
       - "--web.external-url=https://prometheus.tumar.tech"
+      - "--web.enable-admin-api"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
       interval: 15s
@@ -29,9 +60,6 @@ services:
       - ../config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../config/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
       - prometheus_data:/prometheus
-    # Порты закомментированы - доступ только через Traefik
-    # ports:
-    #   - "9090:9090"   # Prometheus UI
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
@@ -46,6 +74,7 @@ services:
       - web
       - internal
 
+  # ==================== Grafana ====================
   grafana:
     image: grafana/grafana:11.2.2
     container_name: grafana
@@ -54,16 +83,18 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
-      # Server configuration (Traefik terminates TLS, Grafana listens on HTTP internally)
+      # Server configuration
       GF_SERVER_DOMAIN: "grafana.tumar.tech"
       GF_SERVER_ROOT_URL: "https://grafana.tumar.tech/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "false"
-      # Security: enforce HTTPS
+      # Security
       GF_SECURITY_COOKIE_SECURE: "true"
       GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"
       GF_SECURITY_STRICT_TRANSPORT_SECURITY_MAX_AGE_SECONDS: "31536000"
       GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
       GF_SECURITY_X_XSS_PROTECTION: "true"
+      # Plugins
+      GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-piechart-panel"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
       interval: 15s
@@ -74,9 +105,6 @@ services:
       - ../config/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ../config/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    # Порты закомментированы - доступ только через Traefik
-    # ports:
-    #   - "3000:3000"   # Grafana UI
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=web"
@@ -84,7 +112,7 @@ services:
       - "traefik.http.routers.grafana.entrypoints=websecure"
       - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-      # Security headers middleware
+      # Security headers
       - "traefik.http.routers.grafana.middlewares=grafana-security"
       - "traefik.http.middlewares.grafana-security.headers.stsSeconds=31536000"
       - "traefik.http.middlewares.grafana-security.headers.stsIncludeSubdomains=true"
@@ -101,6 +129,46 @@ services:
       - prometheus
       - loki
 
+  # ==================== Node Exporter (Host Metrics) ====================
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node-exporter
+    restart: unless-stopped
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    pid: host
+    networks:
+      - internal
+
+  # ==================== cAdvisor (Container Metrics) ====================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    command:
+      - "--housekeeping_interval=30s"
+      - "--docker_only=true"
+      - "--disable_metrics=percpu,sched,tcp,udp,disk,diskIO,hugetlb,referenced_memory,cpu_topology,resctrl"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - internal
+
+  # ==================== Loki (Log Aggregation) ====================
   loki:
     image: grafana/loki:3.2.1
     container_name: loki
@@ -117,6 +185,7 @@ services:
     networks:
       - internal
 
+  # ==================== Promtail (Log Collector) ====================
   promtail:
     image: grafana/promtail:3.2.1
     container_name: promtail
@@ -131,6 +200,19 @@ services:
       - internal
     depends_on:
       - loki
+
+  # ==================== Postgres Exporter (for ops DBs) ====================
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter
+    restart: unless-stopped
+    environment:
+      # Multi-target mode: we'll configure targets in prometheus.yml
+      DATA_SOURCE_URI: "mlflow-db:5432/mlflow?sslmode=disable"
+      DATA_SOURCE_USER: ${MLFLOW_DB_USER:-mlflow}
+      DATA_SOURCE_PASS: ${MLFLOW_DB_PASSWORD:-mlflow}
+    networks:
+      - internal
 
 networks:
   web:
