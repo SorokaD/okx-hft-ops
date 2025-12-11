@@ -102,6 +102,8 @@ services:
       # Важно для работы за reverse proxy
       MINIO_BROWSER_REDIRECT_URL: https://minio.tumar.tech
       MINIO_SERVER_URL: https://s3.tumar.tech
+      # Prometheus metrics без аутентификации
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     healthcheck:
       test: ["CMD-SHELL", "mc ready local || exit 1"]
       interval: 10s
