@@ -1,43 +1,186 @@
+# ============================================
+# Prometheus Configuration for Tumar HFT Infrastructure
+# ============================================
+# Targets:
+#   - Prometheus (self)
+#   - Traefik (reverse proxy)
+#   - Node Exporter (host metrics)
+#   - cAdvisor (container metrics)
+#   - Grafana, Loki (monitoring stack)
+#   - MinIO (S3 storage)
+#   - PostgreSQL databases (via postgres_exporter)
+#   - TimescaleDB (external node: 167.86.110.201)
+#   - Collector (external node: 217.216.73.20)
+# ============================================
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: 'tumar-ops'
+    env: 'production'
 
 rule_files:
   - /etc/prometheus/alert.rules.yml
 
+# Alertmanager configuration (uncomment when ready)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
 scrape_configs:
-  - job_name: prometheus
+  # ==================== Self Monitoring ====================
+  
+  - job_name: 'prometheus'
     static_configs:
       - targets: ['prometheus:9090']
+        labels:
+          service: 'prometheus'
+          node: 'ops'
 
-  - job_name: grafana
+  # ==================== Infrastructure ====================
+  
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8082']
+        labels:
+          service: 'traefik'
+          node: 'ops'
+
+  - job_name: 'node_ops'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          node: 'ops'
+
+  - job_name: 'cadvisor_ops'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          node: 'ops'
+
+  # ==================== Monitoring Stack ====================
+  
+  - job_name: 'grafana'
     metrics_path: /metrics
     static_configs:
       - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+          node: 'ops'
 
-  - job_name: loki
+  - job_name: 'loki'
     metrics_path: /metrics
     static_configs:
       - targets: ['loki:3100']
+        labels:
+          service: 'loki'
+          node: 'ops'
 
-  - job_name: mlflow
-    metrics_path: /
-    scheme: http
-    static_configs:
-      - targets: ['mlflow:5000']
-
-  - job_name: minio
-    metrics_path: /minio/v2/metrics/node
+  # ==================== ML/Data Platform ====================
+  
+  - job_name: 'minio'
+    metrics_path: /minio/v2/metrics/cluster
     static_configs:
       - targets: ['minio:9000']
+        labels:
+          service: 'minio'
+          node: 'ops'
 
-  - job_name: superset
+  # MinIO bucket metrics
+  - job_name: 'minio_bucket'
+    metrics_path: /minio/v2/metrics/bucket
+    static_configs:
+      - targets: ['minio:9000']
+        labels:
+          service: 'minio-bucket'
+          node: 'ops'
+
+  # MLflow - basic health check (no native Prometheus metrics)
+  # Container metrics available via cAdvisor
+  - job_name: 'mlflow'
+    metrics_path: /
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['mlflow:5000']
+        labels:
+          service: 'mlflow'
+          node: 'ops'
+    # MLflow doesn't expose /metrics, this just checks if it's alive
+    # Real metrics come from cAdvisor
+
+  # Superset - health endpoint
+  - job_name: 'superset'
     metrics_path: /health
+    scrape_interval: 30s
     static_configs:
       - targets: ['superset:8088']
+        labels:
+          service: 'superset'
+          node: 'ops'
 
-  - job_name: airflow
+  # Airflow - health endpoint  
+  - job_name: 'airflow'
     metrics_path: /health
+    scrape_interval: 30s
     static_configs:
       - targets: ['airflow-webserver:8080']
+        labels:
+          service: 'airflow'
+          node: 'ops'
 
+  # ==================== PostgreSQL Databases (ops node) ====================
+  
+  - job_name: 'postgres_ops'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres-exporter'
+          node: 'ops'
+          databases: 'mlflow,superset,airflow'
+
+  # ==================== External Nodes ====================
+  # NOTE: These require exporters to be running on the target nodes
+  # Configure firewall to allow Prometheus (ops) to scrape these ports
+  
+  # TimescaleDB (collector node)
+  # Uncomment when postgres_exporter is configured on 167.86.110.201
+  # - job_name: 'postgres_timescale'
+  #   static_configs:
+  #     - targets: ['167.86.110.201:9187']
+  #       labels:
+  #         service: 'postgres-exporter'
+  #         node: 'timescale'
+  #         database: 'okx_hft'
+
+  # Node metrics from TimescaleDB server
+  # Uncomment when node_exporter is configured on 167.86.110.201
+  # - job_name: 'node_timescale'
+  #   static_configs:
+  #     - targets: ['167.86.110.201:9100']
+  #       labels:
+  #         service: 'node-exporter'
+  #         node: 'timescale'
+
+  # Collector Python service
+  # Uncomment when /metrics endpoint is added to collector on 217.216.73.20
+  # - job_name: 'collector'
+  #   metrics_path: /metrics
+  #   static_configs:
+  #     - targets: ['217.216.73.20:8000']
+  #       labels:
+  #         service: 'collector'
+  #         node: 'collector'
+
+  # Node metrics from Collector server
+  # Uncomment when node_exporter is configured on 217.216.73.20
+  # - job_name: 'node_collector'
+  #   static_configs:
+  #     - targets: ['217.216.73.20:9100']
+  #       labels:
+  #         service: 'node-exporter'
+  #         node: 'collector'
