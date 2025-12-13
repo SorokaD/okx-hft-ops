@@ -149,24 +149,22 @@ scrape_configs:
   # NOTE: These require exporters to be running on the target nodes
   # Configure firewall to allow Prometheus (ops) to scrape these ports
   
-  # TimescaleDB (collector node)
-  # Uncomment when postgres_exporter is configured on 167.86.110.201
-  # - job_name: 'postgres_timescale'
-  #   static_configs:
-  #     - targets: ['167.86.110.201:9187']
-  #       labels:
-  #         service: 'postgres-exporter'
-  #         node: 'timescale'
-  #         database: 'okx_hft'
+  # TimescaleDB PostgreSQL metrics
+  - job_name: 'postgres_timescale'
+    static_configs:
+      - targets: ['167.86.110.201:9187']
+        labels:
+          service: 'postgres-exporter'
+          node: 'timescale'
+          database: 'okx_hft'
 
   # Node metrics from TimescaleDB server
-  # Uncomment when node_exporter is configured on 167.86.110.201
-  # - job_name: 'node_timescale'
-  #   static_configs:
-  #     - targets: ['167.86.110.201:9100']
-  #       labels:
-  #         service: 'node-exporter'
-  #         node: 'timescale'
+  - job_name: 'node_timescale'
+    static_configs:
+      - targets: ['167.86.110.201:9100']
+        labels:
+          service: 'node-exporter'
+          node: 'timescale'
 
   # Collector Python service
   # Uncomment when /metrics endpoint is added to collector on 217.216.73.20

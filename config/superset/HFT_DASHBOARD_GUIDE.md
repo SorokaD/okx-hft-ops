@@ -366,3 +366,4 @@ open https://superset.tumar.tech
 *Документация обновлена: 2024-12*
 *Версия Superset: 4.0.1*
 
+
