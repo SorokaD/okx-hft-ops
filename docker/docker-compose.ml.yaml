@@ -19,6 +19,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@airflow-db:5432/${AIRFLOW_DB_NAME:-airflow}
     AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-secret}
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    PYTHONPATH: /opt/airflow/dags/repo/dags:${PYTHONPATH}
     # S3/MinIO connection for remote logging (optional)
     AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
     AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
