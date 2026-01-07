@@ -320,7 +320,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
       airflow-git-sync:
-        condition: service_startedz
+        condition: service_started
 
   airflow-git-sync:
     image: registry.k8s.io/git-sync/git-sync:v4.2.3z
