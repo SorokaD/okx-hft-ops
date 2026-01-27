@@ -135,6 +135,30 @@ scrape_configs:
         target_label: service
         replacement: '${1}'
 
+  # ==================== TCP Probes (Blackbox Exporter) ====================
+  - job_name: 'blackbox_tcp'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+          - 167.86.110.201:5432   # TimescaleDB (PgBouncer)
+          - 167.86.110.201:9187   # Postgres exporter
+          - 217.216.73.20:9108    # Collector metrics
+        labels:
+          node: 'external'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+      - source_labels: [__param_target]
+        regex: '([^:]+):([0-9]+)'
+        target_label: service
+        replacement: '$1:$2'
+
   # ==================== PostgreSQL Databases (ops node) ====================
   
   - job_name: 'postgres_ops'
@@ -167,14 +191,13 @@ scrape_configs:
           node: 'timescale'
 
   # Collector Python service
-  # Uncomment when /metrics endpoint is added to collector on 217.216.73.20
-  # - job_name: 'collector'
-  #   metrics_path: /metrics
-  #   static_configs:
-  #     - targets: ['217.216.73.20:8000']
-  #       labels:
-  #         service: 'collector'
-  #         node: 'collector'
+  - job_name: 'collector'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['217.216.73.20:9108']
+        labels:
+          service: 'collector'
+          node: 'collector'
 
   # Node metrics from Collector server
   # Uncomment when node_exporter is configured on 217.216.73.20
