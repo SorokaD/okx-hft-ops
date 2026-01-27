@@ -21,7 +21,7 @@
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "targets": [
         {
-          "expr": "count(container_last_seen{job=\"cadvisor_ops\",name!=\"\"})",
+          "expr": "count(container_last_seen{job=\"cadvisor_ops\",container!=\"\",image!=\"\"})",
           "legendFormat": "Running Containers",
           "refId": "A"
         }
@@ -44,7 +44,7 @@
       "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "targets": [
         {
-          "expr": "sum(container_memory_usage_bytes{job=\"cadvisor_ops\",name!=\"\"})",
+          "expr": "sum(container_memory_usage_bytes{job=\"cadvisor_ops\",container!=\"\",image!=\"\"})",
           "legendFormat": "Total Memory",
           "refId": "A"
         }
@@ -67,7 +67,7 @@
       "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "targets": [
         {
-          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor_ops\",name!=\"\"}[5m])) * 100",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}[5m])) * 100",
           "legendFormat": "Total CPU",
           "refId": "A"
         }
@@ -90,7 +90,7 @@
       "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "targets": [
         {
-          "expr": "sum(rate(container_network_receive_bytes_total{job=\"cadvisor_ops\",name!=\"\"}[5m])) + sum(rate(container_network_transmit_bytes_total{job=\"cadvisor_ops\",name!=\"\"}[5m]))",
+          "expr": "sum(rate(container_network_receive_bytes_total{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}[5m])) + sum(rate(container_network_transmit_bytes_total{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}[5m]))",
           "legendFormat": "Network I/O",
           "refId": "A"
         }
@@ -114,8 +114,8 @@
       "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true, "sortBy": "Max", "sortDesc": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{job=\"cadvisor_ops\",name!=\"\"}[5m]) * 100",
-          "legendFormat": "{{name}}",
+          "expr": "rate(container_cpu_usage_seconds_total{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}[5m]) * 100",
+          "legendFormat": "{{container}}",
           "refId": "A"
         }
       ],
@@ -138,8 +138,8 @@
       "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true, "sortBy": "Max", "sortDesc": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
         {
-          "expr": "container_memory_usage_bytes{job=\"cadvisor_ops\",name!=\"\"}",
-          "legendFormat": "{{name}}",
+          "expr": "container_memory_usage_bytes{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}",
+          "legendFormat": "{{container}}",
           "refId": "A"
         }
       ],
@@ -162,8 +162,8 @@
       "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true, "sortBy": "Max", "sortDesc": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
         {
-          "expr": "rate(container_network_receive_bytes_total{job=\"cadvisor_ops\",name!=\"\"}[5m])",
-          "legendFormat": "{{name}} RX",
+          "expr": "rate(container_network_receive_bytes_total{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}[5m])",
+          "legendFormat": "{{container}} RX",
           "refId": "A"
         }
       ],
@@ -186,8 +186,8 @@
       "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true, "sortBy": "Max", "sortDesc": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "targets": [
         {
-          "expr": "rate(container_network_transmit_bytes_total{job=\"cadvisor_ops\",name!=\"\"}[5m])",
-          "legendFormat": "{{name}} TX",
+          "expr": "rate(container_network_transmit_bytes_total{job=\"cadvisor_ops\",container!=\"\",image!=\"\"}[5m])",
+          "legendFormat": "{{container}} TX",
           "refId": "A"
         }
       ],

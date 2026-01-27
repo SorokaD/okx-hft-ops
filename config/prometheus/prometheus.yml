@@ -175,8 +175,8 @@ scrape_configs:
   
   # TimescaleDB PostgreSQL metrics
   - job_name: 'postgres_timescale'
-    scrape_interval: 30s
-    scrape_timeout: 25s
+    scrape_interval: 60s
+    scrape_timeout: 55s
     static_configs:
       - targets: ['167.86.110.201:9187']
         labels:
