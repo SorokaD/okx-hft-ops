@@ -119,7 +119,7 @@ else:
 # ============================================
 
 WEBSERVER_THREADS = 8
-SUPERSET_WEBSERVER_TIMEOUT = 120  # Увеличен для тяжелых HFT запросов
+SUPERSET_WEBSERVER_TIMEOUT = 300  # Увеличен для тяжелых HFT запросов
 
 # Row limit для SQL Lab (HFT может генерировать много данных)
 ROW_LIMIT = 50000
@@ -131,8 +131,8 @@ DISPLAY_MAX_ROW = 10000
 # ============================================
 
 # Async queries - важно для больших HFT датасетов
-SQLLAB_ASYNC_TIME_LIMIT_SEC = 60 * 15  # 15 min
-SQLLAB_TIMEOUT = 60 * 5  # 5 min default timeout
+SQLLAB_ASYNC_TIME_LIMIT_SEC = 60 * 30  # 30 min
+SQLLAB_TIMEOUT = 60 * 10  # 10 min default timeout
 
 # Разрешаем CTAS/CVAS для создания таблиц из запросов
 SQLLAB_CTAS_NO_LIMIT = True
@@ -227,6 +227,15 @@ SQLALCHEMY_ENGINE_OPTIONS = {
     "pool_recycle": 3600,
     "pool_pre_ping": True,
     "max_overflow": 20,
+    "pool_timeout": 30,
+    "connect_args": {
+        "connect_timeout": 10,
+        "options": "-c statement_timeout=600000",
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    },
 }
 
 # ============================================
