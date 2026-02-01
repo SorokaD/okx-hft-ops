@@ -188,7 +188,7 @@
       "gridPos": {"h": 4, "w": 8, "x": 0, "y": 12},
       "id": 12,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [{"expr": "probe_success{job=\"blackbox_tcp\",instance=\"167.86.110.201:5432\"}", "refId": "A"}],
+      "targets": [{"expr": "probe_success{job=\"blackbox_tcp\",instance=\"167.86.110.201:6432\"}", "refId": "A"}],
       "title": "Timescale PgBouncer TCP",
       "type": "stat"
     },
